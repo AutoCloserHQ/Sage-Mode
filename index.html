@@ -1,186 +1,756 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="utf-8"/>
-<meta name="viewport" content="width=device-width, initial-scale=1"/>
-<title>Duo90 Tracker · Derrick & Kimaada</title>
-<link rel="preconnect" href="https://cdn.jsdelivr.net"/>
-<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js" crossorigin="anonymous"></script>
-<style>
-  :root{--bg1:#fff1f2;--bg2:#ffe4e6;--ink:#111827;--card:#ffffffcc}
-  *{box-sizing:border-box} body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto;line-height:1.4;color:var(--ink);background:linear-gradient(135deg,var(--bg1),var(--bg2))}
-  .wrap{max-width:1100px;margin:0 auto;padding:24px}
-  .row{display:grid;grid-template-columns:1fr;gap:16px}
-  @media(min-width:960px){.row{grid-template-columns:2fr 1fr}}
-  .card{background:var(--card);backdrop-filter:blur(8px);border-radius:18px;box-shadow:0 10px 30px #00000014;padding:16px}
-  h1{margin:0 0 4px;font-size:28px} .muted{opacity:.75}
-  .toolbar{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
-  .pill{padding:8px 12px;border-radius:999px;background:#fff}
-  select,input,textarea,button,label{font:inherit}
-  input,textarea,select{width:100%;padding:10px 12px;border:1px solid #e5e7eb;border-radius:12px;background:#fff}
-  button{padding:10px 14px;border:0;border-radius:14px;background:#111827;color:#fff;cursor:pointer}
-  button.alt{background:#fff;color:#111827;border:1px solid #111827}
-  .grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
-  .section{margin-top:10px} .label{font-size:12px;opacity:.8;margin-bottom:4px}
-  .latest{font-size:14px;background:#fff;border-radius:12px;padding:10px}
-  canvas{background:#fff;border-radius:12px;padding:6px}
-</style>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Sage Mode</title>
+  <style>
+    :root {
+      --bg-1: #050816;
+      --bg-2: #0b1026;
+      --panel: rgba(14, 22, 48, 0.72);
+      --panel-2: rgba(21, 33, 71, 0.82);
+      --line: rgba(130, 170, 255, 0.18);
+      --glow: #66d9ff;
+      --glow-2: #8b5cf6;
+      --text: #eef4ff;
+      --muted: #98a7cc;
+      --success: #6ee7b7;
+      --warning: #fbbf24;
+      --danger: #fb7185;
+      --shadow: 0 0 0 1px rgba(133, 170, 255, 0.08), 0 20px 60px rgba(0, 0, 0, 0.45), 0 0 40px rgba(102, 217, 255, 0.08);
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      color: var(--text);
+      background:
+        radial-gradient(circle at top left, rgba(102, 217, 255, 0.16), transparent 28%),
+        radial-gradient(circle at top right, rgba(139, 92, 246, 0.14), transparent 24%),
+        radial-gradient(circle at bottom center, rgba(17, 24, 39, 0.9), transparent 40%),
+        linear-gradient(160deg, var(--bg-1), var(--bg-2) 60%, #050814);
+      overflow-x: hidden;
+    }
+
+    .grid-overlay,
+    .noise,
+    .orbs {
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+    }
+
+    .grid-overlay {
+      background-image:
+        linear-gradient(rgba(130, 170, 255, 0.06) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(130, 170, 255, 0.06) 1px, transparent 1px);
+      background-size: 40px 40px;
+      mask-image: radial-gradient(circle at center, black 45%, transparent 90%);
+    }
+
+    .noise {
+      opacity: 0.045;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140' viewBox='0 0 140 140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='140' height='140' filter='url(%23n)' opacity='.75'/%3E%3C/svg%3E");
+    }
+
+    .orbs::before,
+    .orbs::after {
+      content: "";
+      position: absolute;
+      width: 28rem;
+      height: 28rem;
+      border-radius: 999px;
+      filter: blur(70px);
+      opacity: 0.12;
+      animation: float 12s ease-in-out infinite;
+    }
+
+    .orbs::before {
+      top: 5%;
+      left: -6%;
+      background: var(--glow);
+    }
+
+    .orbs::after {
+      right: -8%;
+      bottom: 0;
+      background: var(--glow-2);
+      animation-delay: -4s;
+    }
+
+    @keyframes float {
+      0%, 100% { transform: translateY(0px) translateX(0px); }
+      50% { transform: translateY(-18px) translateX(16px); }
+    }
+
+    .app {
+      position: relative;
+      z-index: 1;
+      width: min(1200px, calc(100% - 32px));
+      margin: 24px auto 40px;
+      display: grid;
+      gap: 18px;
+    }
+
+    .topbar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 16px;
+      padding: 18px 20px;
+      border: 1px solid var(--line);
+      background: rgba(8, 13, 31, 0.78);
+      box-shadow: var(--shadow);
+      backdrop-filter: blur(16px);
+      border-radius: 24px;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+    }
+
+    .brand-mark {
+      width: 52px;
+      height: 52px;
+      border-radius: 18px;
+      display: grid;
+      place-items: center;
+      background: linear-gradient(135deg, rgba(102, 217, 255, 0.16), rgba(139, 92, 246, 0.18));
+      border: 1px solid rgba(130, 170, 255, 0.2);
+      box-shadow: inset 0 0 30px rgba(102, 217, 255, 0.08), 0 0 26px rgba(102, 217, 255, 0.08);
+      font-weight: 800;
+      font-size: 1.15rem;
+      letter-spacing: 0.08em;
+    }
+
+    .brand h1 {
+      margin: 0;
+      font-size: clamp(1.3rem, 2vw, 1.8rem);
+      letter-spacing: 0.06em;
+    }
+
+    .brand p,
+    .clock,
+    .muted {
+      margin: 0;
+      color: var(--muted);
+    }
+
+    .clock {
+      font-size: 0.95rem;
+      text-align: right;
+      line-height: 1.45;
+    }
+
+    .hero {
+      display: grid;
+      grid-template-columns: 1.35fr 0.95fr;
+      gap: 18px;
+    }
+
+    .panel {
+      position: relative;
+      border-radius: 28px;
+      background: var(--panel);
+      border: 1px solid var(--line);
+      box-shadow: var(--shadow);
+      backdrop-filter: blur(18px);
+      overflow: hidden;
+    }
+
+    .panel::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(180deg, rgba(255,255,255,0.04), transparent 35%);
+      pointer-events: none;
+    }
+
+    .hero-left {
+      padding: 28px;
+    }
+
+    .eyebrow {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      border-radius: 999px;
+      padding: 8px 12px;
+      font-size: 0.82rem;
+      color: #d5e9ff;
+      border: 1px solid rgba(130, 170, 255, 0.18);
+      background: rgba(102, 217, 255, 0.08);
+      margin-bottom: 14px;
+    }
+
+    .hero-left h2 {
+      margin: 0 0 10px;
+      font-size: clamp(2rem, 4vw, 3.3rem);
+      line-height: 1.02;
+      letter-spacing: -0.04em;
+    }
+
+    .hero-left .sub {
+      max-width: 60ch;
+      line-height: 1.65;
+      color: #c4d2f0;
+      margin-bottom: 22px;
+    }
+
+    .stats {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 12px;
+      margin-bottom: 22px;
+    }
+
+    .stat {
+      border-radius: 22px;
+      padding: 16px;
+      background: rgba(10, 18, 40, 0.72);
+      border: 1px solid rgba(130, 170, 255, 0.12);
+    }
+
+    .stat .label {
+      font-size: 0.8rem;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      margin-bottom: 8px;
+    }
+
+    .stat .value {
+      font-size: clamp(1.2rem, 2vw, 1.8rem);
+      font-weight: 700;
+    }
+
+    .buttons {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 12px;
+    }
+
+    button.mode {
+      position: relative;
+      width: 100%;
+      padding: 16px 16px;
+      border: 1px solid rgba(130, 170, 255, 0.18);
+      border-radius: 20px;
+      background: linear-gradient(180deg, rgba(14, 22, 48, 0.95), rgba(10, 16, 37, 0.9));
+      color: var(--text);
+      cursor: pointer;
+      text-align: left;
+      transition: transform 160ms ease, border-color 160ms ease, box-shadow 160ms ease;
+      box-shadow: inset 0 0 28px rgba(255,255,255,0.02);
+    }
+
+    button.mode:hover,
+    button.mode.active {
+      transform: translateY(-2px);
+      border-color: rgba(102, 217, 255, 0.4);
+      box-shadow: 0 0 0 1px rgba(102, 217, 255, 0.08), 0 14px 34px rgba(0,0,0,0.35), 0 0 24px rgba(102, 217, 255, 0.08);
+    }
+
+    button.mode .tiny {
+      display: block;
+      margin-top: 4px;
+      color: var(--muted);
+      font-size: 0.86rem;
+    }
+
+    .hero-right {
+      display: grid;
+      grid-template-rows: 1fr auto;
+      gap: 16px;
+      padding: 18px;
+    }
+
+    .transmission {
+      border-radius: 24px;
+      background: var(--panel-2);
+      border: 1px solid rgba(130, 170, 255, 0.16);
+      padding: 22px;
+      min-height: 320px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+    }
+
+    .transmission h3,
+    .mission h3,
+    .module h3 {
+      margin: 0 0 10px;
+      font-size: 0.95rem;
+      text-transform: uppercase;
+      letter-spacing: 0.12em;
+      color: #cfe6ff;
+    }
+
+    .quote {
+      font-size: clamp(1.2rem, 2vw, 1.55rem);
+      line-height: 1.6;
+      font-weight: 600;
+      letter-spacing: -0.02em;
+      white-space: pre-wrap;
+    }
+
+    .tag-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 14px;
+    }
+
+    .tag {
+      padding: 8px 11px;
+      border-radius: 999px;
+      background: rgba(102, 217, 255, 0.08);
+      border: 1px solid rgba(102, 217, 255, 0.15);
+      color: #dbf3ff;
+      font-size: 0.82rem;
+    }
+
+    .transmission-footer {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+      margin-top: 18px;
+      color: var(--muted);
+      font-size: 0.9rem;
+    }
+
+    .mission {
+      border-radius: 24px;
+      background: rgba(7, 14, 31, 0.82);
+      border: 1px solid rgba(130, 170, 255, 0.16);
+      padding: 18px 22px 20px;
+    }
+
+    .mission p {
+      margin: 0;
+      line-height: 1.65;
+      color: #d7e2fb;
+    }
+
+    .lower {
+      display: grid;
+      grid-template-columns: 1.05fr 0.95fr;
+      gap: 18px;
+    }
+
+    .module {
+      padding: 22px;
+    }
+
+    .list {
+      display: grid;
+      gap: 12px;
+      margin-top: 12px;
+    }
+
+    .list-item {
+      padding: 14px 16px;
+      border-radius: 18px;
+      background: rgba(9, 15, 33, 0.72);
+      border: 1px solid rgba(130, 170, 255, 0.1);
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      align-items: center;
+    }
+
+    .list-item strong {
+      display: block;
+      margin-bottom: 4px;
+    }
+
+    .pill {
+      white-space: nowrap;
+      border-radius: 999px;
+      padding: 7px 10px;
+      font-size: 0.78rem;
+      border: 1px solid rgba(130, 170, 255, 0.14);
+      color: #dcedff;
+      background: rgba(102, 217, 255, 0.07);
+    }
+
+    .progress-wrap {
+      display: grid;
+      gap: 14px;
+      margin-top: 8px;
+    }
+
+    .progress-card {
+      padding: 14px 16px;
+      border-radius: 18px;
+      background: rgba(9, 15, 33, 0.72);
+      border: 1px solid rgba(130, 170, 255, 0.1);
+    }
+
+    .progress-head {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 10px;
+    }
+
+    .bar {
+      height: 10px;
+      border-radius: 999px;
+      background: rgba(130, 170, 255, 0.1);
+      overflow: hidden;
+      box-shadow: inset 0 0 10px rgba(0,0,0,0.25);
+    }
+
+    .fill {
+      height: 100%;
+      border-radius: inherit;
+      background: linear-gradient(90deg, var(--glow), var(--glow-2));
+      box-shadow: 0 0 18px rgba(102, 217, 255, 0.24);
+    }
+
+    .footer-note {
+      text-align: center;
+      color: var(--muted);
+      font-size: 0.9rem;
+      padding: 6px 0 2px;
+    }
+
+    @media (max-width: 980px) {
+      .hero,
+      .lower {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    @media (max-width: 700px) {
+      .app {
+        width: min(100% - 18px, 100%);
+        margin-top: 10px;
+      }
+
+      .topbar,
+      .hero-left,
+      .hero-right,
+      .module {
+        padding-left: 16px;
+        padding-right: 16px;
+      }
+
+      .topbar {
+        flex-direction: column;
+        align-items: flex-start;
+      }
+
+      .stats,
+      .buttons {
+        grid-template-columns: 1fr;
+      }
+
+      .quote {
+        font-size: 1.08rem;
+      }
+
+      .transmission {
+        min-height: 280px;
+      }
+    }
+  </style>
 </head>
 <body>
-  <div class="wrap">
-    <header class="toolbar">
-      <div>
-        <h1>Duo90 Tracker</h1>
-        <div class="muted">For Derrick & Kimaada — simple, pretty progress</div>
-      </div>
-      <div style="flex:1"></div>
-      <label class="pill">Person
-        <select id="person">
-          <option value="derrick">Derrick</option>
-          <option value="kimaada">Kimaada</option>
-        </select>
-      </label>
-      <button id="dl" class="alt">Download CSV</button>
-      <label class="pill">Import CSV
-        <input id="file" type="file" accept=".csv"/>
-      </label>
-    </header>
+  <div class="grid-overlay"></div>
+  <div class="noise"></div>
+  <div class="orbs"></div>
 
-    <div class="row section">
-      <div class="card">
-        <div class="label">Weight trend (lb)</div>
-        <div style="height:240px"><canvas id="wChart"></canvas></div>
-        <div class="label" style="margin-top:12px">Measurements (in)</div>
-        <div style="height:240px"><canvas id="mChart"></canvas></div>
-      </div>
-
-      <div class="card">
-        <div class="label">Add / Update entry</div>
-        <div class="grid">
-          <div><div class="label">Date</div><input id="date" type="date"></div>
-          <div><div class="label">Weight (lb)</div><input id="weight" placeholder="e.g., 284.6"></div>
-          <div><div class="label">Waist (in)</div><input id="waist" placeholder="e.g., 47.8"></div>
-          <div><div class="label">Chest (in)</div><input id="chest" placeholder="e.g., 50"></div>
-          <div><div class="label">Hips (in)</div><input id="hips" placeholder="e.g., 49"></div>
-          <div style="grid-column:1/-1"><div class="label">Notes</div><textarea id="notes" rows="3" placeholder="hydration, sleep, workouts, wins…"></textarea></div>
-        </div>
-        <div class="section"><button id="save" type="button" onclick="addEntry()">Save in page</button></div>
-        <div class="section">
-          <div class="label">Latest entry</div>
-          <div id="latest" class="latest">— No data yet —</div>
+  <main class="app">
+    <section class="topbar panel">
+      <div class="brand">
+        <div class="brand-mark">SM</div>
+        <div>
+          <h1>Sage Mode</h1>
+          <p>Focus. Fire. Future. Choose the energy you need.</p>
         </div>
       </div>
-    </div>
-  </div>
+      <div class="clock">
+        <div id="dateLine">Loading date...</div>
+        <div id="timeLine">Loading time...</div>
+      </div>
+    </section>
 
-<script>
-const FIELDS=["date","weight","waist","chest","hips","notes"];
-const state={ person:"derrick", data:{ derrick:[], kimaada:[] }, charts:{ w:null,m:null } };
-const $=id=>document.getElementById(id);
+    <section class="hero">
+      <div class="hero-left panel">
+        <div class="eyebrow">⚡ Neural Focus Interface</div>
+        <h2>Step into the version of you that actually executes.</h2>
+        <p class="sub">
+          Pick a mode. Reset your energy. Lock into the mission. This is version one of your private motivation console — built for discipline, momentum, and that futuristic Sage vibe.
+        </p>
 
-function init(){
-  $("date").value=new Date().toISOString().slice(0,10);
-  $("person").addEventListener("change",e=>{state.person=e.target.value; renderAll()});
-  $("save").addEventListener("click",addEntry);
-  $("dl").addEventListener("click",downloadCSV);
-  $("file").addEventListener("change",e=>e.target.files[0]&&importCSV(e.target.files[0]));
-  Promise.all([loadCSV("derrick"),loadCSV("kimaada")]).then(renderAll);
-}
+        <div class="stats">
+          <div class="stat">
+            <div class="label">Current Mode</div>
+            <div class="value" id="currentModeLabel">Lock In</div>
+          </div>
+          <div class="stat">
+            <div class="label">Energy Level</div>
+            <div class="value" id="energyLabel">92%</div>
+          </div>
+          <div class="stat">
+            <div class="label">Streak Signal</div>
+            <div class="value" id="streakLabel">7 Days</div>
+          </div>
+        </div>
 
-async function loadCSV(p){
-  try{
-    const res=await fetch(`data/${p}.csv?t=${Date.now()}`);
-    if(!res.ok) return; // file might not exist yet
-    const text=await res.text();
-    state.data[p]=parseCSV(text);
-  }catch(e){ /* ignore */ }
-}
+        <div class="buttons" id="modeButtons"></div>
+      </div>
 
-function parseCSV(text){
-  const lines=text.trim().split(/\r?\n/); if(!lines.length) return [];
-  const head=lines[0].split(",").map(s=>s.trim().toLowerCase());
-  const idx={}; FIELDS.forEach(f=>idx[f]=head.indexOf(f));
-  const out=[];
-  for(let i=1;i<lines.length;i++){
-    const row=splitRow(lines[i]); if(!row.length) continue;
-    const get=k=>idx[k]>=0?row[idx[k]]:"";
-    const num=v=>v===""?null:parseFloat(v);
-    const e={date:get("date"),weight:num(get("weight")),waist:num(get("waist")),chest:num(get("chest")),hips:num(get("hips")),notes:get("notes")};
-    if(e.date) out.push(e);
-  }
-  return out.sort((a,b)=>a.date.localeCompare(b.date));
-}
-function splitRow(s){
-  const r=[]; let cur="",q=false; for(let i=0;i<s.length;i++){
-    const c=s[i];
-    if(c==='\"'){ if(q&&s[i+1]==='\"'){cur+='\"';i++;} else q=!q; }
-    else if(c===","&&!q){ r.push(cur.trim()); cur=""; }
-    else cur+=c;
-  } r.push(cur.trim()); return r;
-}
-function toCSV(arr){
-  const lines=[FIELDS.join(",")];
-  for(const e of arr){
-    const vals=FIELDS.map(k=>{let v=e[k]??""; v=String(v); return (v.includes(",")||v.includes('"'))? '"'+v.replaceAll('"','""')+'"':v;});
-    lines.push(vals.join(","));
-  }
-  return lines.join("\n");
-}
+      <div class="hero-right panel">
+        <div class="transmission">
+          <div>
+            <h3>Sage Transmission</h3>
+            <div class="quote" id="quoteBox"></div>
+            <div class="tag-row" id="tagRow"></div>
+          </div>
+          <div class="transmission-footer">
+            <span id="statusLine">System aligned.</span>
+            <span>Version 1.0</span>
+          </div>
+        </div>
 
-function addEntry(){
-  const e={
-    date:$("date").value,
-    weight: num($("weight").value),
-    waist:  num($("waist").value),
-    chest:  num($("chest").value),
-    hips:   num($("hips").value),
-    notes:  $("notes").value.trim()
-  };
-  if(!e.date) return alert("Pick a date");
-  const list=state.data[state.person].filter(x=>x.date!==e.date); list.push(e);
-  state.data[state.person]=list.sort((a,b)=>a.date.localeCompare(b.date));
-  ["weight","waist","chest","hips","notes"].forEach(id=>$(id).value="");
-  renderAll();
-}
-function num(v){ if(v===""||v==null) return null; const n=parseFloat(v); return isFinite(n)?n:null; }
-function pretty(n){ return (n==null||isNaN(n))?"—":Number(n).toFixed(1); }
+        <div class="mission">
+          <h3>Today's Mission</h3>
+          <p id="missionText"></p>
+        </div>
+      </div>
+    </section>
 
-function downloadCSV(){
-  const csv=toCSV(state.data[state.person]);
-  const a=document.createElement("a");
-  a.href=URL.createObjectURL(new Blob([csv],{type:"text/csv"}));
-  a.download=state.person+".csv"; a.click(); URL.revokeObjectURL(a.href);
-}
-function importCSV(file){
-  const fr=new FileReader(); fr.onload=()=>{ state.data[state.person]=parseCSV(String(fr.result||"")); renderAll(); };
-  fr.readAsText(file);
-}
+    <section class="lower">
+      <div class="panel module">
+        <h3>Action Queue</h3>
+        <p class="muted">Simple moves. No overthinking. Just momentum.</p>
+        <div class="list" id="actionList"></div>
+      </div>
 
-function renderAll(){
-  const list=state.data[state.person];
-  const last=list[list.length-1];
-  $("latest").innerHTML= last? `📅 <b>${last.date}</b><br>⚖️ ${pretty(last.weight)} lb<br>📏 waist ${pretty(last.waist)} · chest ${pretty(last.chest)} · hips ${pretty(last.hips)}<br>📝 ${last.notes||"—"}`: "— No data yet —";
-  const labels=list.map(e=>e.date);
-  const wdata=list.map(e=>e.weight);
-  const waist=list.map(e=>e.waist), chest=list.map(e=>e.chest), hips=list.map(e=>e.hips);
-  drawWeight(labels,wdata); drawMeasures(labels,waist,chest,hips);
-}
+      <div class="panel module">
+        <h3>Core Systems</h3>
+        <p class="muted">A visual reminder that real life is the mission.</p>
+        <div class="progress-wrap" id="progressWrap"></div>
+      </div>
+    </section>
 
-function drawWeight(labels,data){
-  const ctx=$("wChart").getContext("2d");
-  if(state.charts.w) state.charts.w.destroy();
-  state.charts.w=new Chart(ctx,{type:"line",data:{labels,datasets:[{label:"Weight",data,borderWidth:3,pointRadius:4,spanGaps:true}]},
-    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{y:{beginAtZero:false}}}});
-}
-function drawMeasures(labels,waist,chest,hips){
-  const ctx=$("mChart").getContext("2d");
-  if(state.charts.m) state.charts.m.destroy();
-  state.charts.m=new Chart(ctx,{type:"bar",data:{labels,datasets:[
-    {label:"Waist",data:waist},{label:"Chest",data:chest},{label:"Hips",data:hips}]},
-    options:{responsive:true,maintainAspectRatio:false}});
-}
+    <div class="footer-note">Built for fun in GitHub Pages or any simple HTML host.</div>
+  </main>
 
-init();
-</script>
+  <script>
+    const modes = [
+      {
+        id: 'lock-in',
+        name: 'Lock In',
+        subtitle: 'Cut the noise. Execute the mission.',
+        energy: '92%',
+        streak: '7 Days',
+        status: 'Distraction shields active.',
+        quote: 'You do not need perfect conditions.\nYou need movement.\nOne clean decision can restart everything.',
+        tags: ['Focus', 'Discipline', 'Momentum'],
+        mission: 'Complete one meaningful task before checking anything that does not move your life forward.',
+        actions: [
+          ['Pick one task', 'Do the next real move, not the easiest one.'],
+          ['Set 25 minutes', 'No scrolling, no switching tabs, no escape.'],
+          ['Finish the rep', 'Leave with proof, not just intention.']
+        ]
+      },
+      {
+        id: 'war-mode',
+        name: 'War Mode',
+        subtitle: 'Pressure creates sharpness when you stop flinching.',
+        energy: '99%',
+        streak: 'Battle Ready',
+        status: 'Aggressive execution online.',
+        quote: 'Nobody is coming to save the day for you.\nGood.\nThat means the power is still yours.',
+        tags: ['Intensity', 'Courage', 'No Excuses'],
+        mission: 'Attack the task you have been avoiding. That is probably the one with the money on the other side.',
+        actions: [
+          ['Hit the hardest task first', 'Go where resistance is loudest.'],
+          ['Move fast', 'Decide, act, adjust.'],
+          ['End stronger than you started', 'Make today expensive for procrastination.']
+        ]
+      },
+      {
+        id: 'money-mode',
+        name: 'Money Mode',
+        subtitle: 'Think in leverage, not just labor.',
+        energy: '88%',
+        streak: 'Revenue Focus',
+        status: 'Value radar calibrated.',
+        quote: 'Money likes clarity.\nWhen the offer is clear, the follow-up is sharp, and the action is daily, opportunities stop hiding.',
+        tags: ['Leverage', 'Offers', 'Revenue'],
+        mission: 'Do one thing today that can create money later — outreach, build, follow-up, or improve the offer.',
+        actions: [
+          ['Find the lever', 'What action could create repeat upside?'],
+          ['Make one offer stronger', 'Clear beats clever.'],
+          ['Do one revenue move', 'Even a small move keeps the machine alive.']
+        ]
+      },
+      {
+        id: 'rebuild',
+        name: 'Rebuild',
+        subtitle: 'For the days that feel off. Reset anyway.',
+        energy: '71%',
+        streak: 'Recovery Loop',
+        status: 'System stabilizing.',
+        quote: 'A rough day is not a ruined identity.\nReset the room. Reset the mind. Reset the next hour.',
+        tags: ['Reset', 'Grace', 'Restart'],
+        mission: 'Shrink the day down. Clean one thing, handle one task, and let momentum come back quietly.',
+        actions: [
+          ['Clear your space', 'Outer order helps inner order.'],
+          ['Drink water and breathe', 'Your nervous system matters.'],
+          ['Win one hour', 'You do not need to win the whole week today.']
+        ]
+      },
+      {
+        id: 'god-mode',
+        name: 'God Mode',
+        subtitle: 'Legacy energy. Bigger than mood.',
+        energy: '100%',
+        streak: 'Chosen Path',
+        status: 'Legacy systems humming.',
+        quote: 'Move like your future family is already depending on the man you choose to be today.\nBecause they are.',
+        tags: ['Legacy', 'Vision', 'Power'],
+        mission: 'Make one move today that your future self would call elite, even if nobody sees it but you.',
+        actions: [
+          ['Think long-term', 'Choose legacy over comfort.'],
+          ['Protect your energy', 'Guard what feeds your purpose.'],
+          ['Leave evidence', 'Build something your future can stand on.']
+        ]
+      },
+      {
+        id: 'calm',
+        name: 'Calm Signal',
+        subtitle: 'Steady the system and move with peace.',
+        energy: '84%',
+        streak: 'Centered',
+        status: 'Breath rate normalized.',
+        quote: 'Peace is not weakness.\nPeace is power under control.\nSlow your breath and choose your next move cleanly.',
+        tags: ['Peace', 'Breath', 'Clarity'],
+        mission: 'Lower the noise in your body first. Then decide what actually matters next.',
+        actions: [
+          ['Take 5 deep breaths', 'Longer exhale than inhale.'],
+          ['Relax your shoulders', 'Signal safety to your body.'],
+          ['Choose one calm action', 'A peaceful move still counts as progress.']
+        ]
+      }
+    ];
+
+    const systems = [
+      ['Body', 74],
+      ['Mind', 81],
+      ['Money', 58],
+      ['Mission', 67],
+      ['Legacy', 63]
+    ];
+
+    const buttons = document.getElementById('modeButtons');
+    const quoteBox = document.getElementById('quoteBox');
+    const tagRow = document.getElementById('tagRow');
+    const missionText = document.getElementById('missionText');
+    const actionList = document.getElementById('actionList');
+    const progressWrap = document.getElementById('progressWrap');
+    const currentModeLabel = document.getElementById('currentModeLabel');
+    const energyLabel = document.getElementById('energyLabel');
+    const streakLabel = document.getElementById('streakLabel');
+    const statusLine = document.getElementById('statusLine');
+
+    let activeMode = modes[0].id;
+
+    function renderButtons() {
+      buttons.innerHTML = '';
+      modes.forEach((mode) => {
+        const btn = document.createElement('button');
+        btn.className = 'mode' + (mode.id === activeMode ? ' active' : '');
+        btn.innerHTML = `<strong>${mode.name}</strong><span class="tiny">${mode.subtitle}</span>`;
+        btn.addEventListener('click', () => {
+          activeMode = mode.id;
+          renderButtons();
+          renderMode();
+        });
+        buttons.appendChild(btn);
+      });
+    }
+
+    function renderMode() {
+      const mode = modes.find((m) => m.id === activeMode) || modes[0];
+      quoteBox.textContent = mode.quote;
+      missionText.textContent = mode.mission;
+      currentModeLabel.textContent = mode.name;
+      energyLabel.textContent = mode.energy;
+      streakLabel.textContent = mode.streak;
+      statusLine.textContent = mode.status;
+
+      tagRow.innerHTML = '';
+      mode.tags.forEach((tag) => {
+        const el = document.createElement('span');
+        el.className = 'tag';
+        el.textContent = tag;
+        tagRow.appendChild(el);
+      });
+
+      actionList.innerHTML = '';
+      mode.actions.forEach(([title, desc]) => {
+        const item = document.createElement('div');
+        item.className = 'list-item';
+        item.innerHTML = `
+          <div>
+            <strong>${title}</strong>
+            <span class="muted">${desc}</span>
+          </div>
+          <span class="pill">Ready</span>
+        `;
+        actionList.appendChild(item);
+      });
+    }
+
+    function renderSystems() {
+      progressWrap.innerHTML = '';
+      systems.forEach(([name, value]) => {
+        const card = document.createElement('div');
+        card.className = 'progress-card';
+        card.innerHTML = `
+          <div class="progress-head">
+            <strong>${name}</strong>
+            <span class="muted">${value}%</span>
+          </div>
+          <div class="bar"><div class="fill" style="width:${value}%"></div></div>
+        `;
+        progressWrap.appendChild(card);
+      });
+    }
+
+    function updateClock() {
+      const now = new Date();
+      document.getElementById('dateLine').textContent = now.toLocaleDateString(undefined, {
+        weekday: 'long',
+        month: 'long',
+        day: 'numeric',
+        year: 'numeric'
+      });
+      document.getElementById('timeLine').textContent = now.toLocaleTimeString(undefined, {
+        hour: 'numeric',
+        minute: '2-digit',
+        second: '2-digit'
+      });
+    }
+
+    renderButtons();
+    renderMode();
+    renderSystems();
+    updateClock();
+    setInterval(updateClock, 1000);
+  </script>
 </body>
 </html>
